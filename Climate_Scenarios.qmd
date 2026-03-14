@@ -1,0 +1,145 @@
+---
+title: "Climate Scenarios"
+format: html
+---
+
+
+## Hydrological Data
+```{r}
+require(tidyverse)
+require(sf)
+require(terra)
+require(gt)
+
+```
+
+
+```{r}
+hydrometric_stations <- readxl::read_xlsx("../Hydrological_data/Hydrometric stations.xlsx") |> 
+    mutate(
+        X = abs(X), 
+        Y = if_else(Y>0, Y*-1,Y)
+        )
+head(hydrometric_stations)
+
+boundary = st_read("../SPATIAL/CC Adaptation/Revised_Boundary/Boundary.shp") |>  
+    st_transform(crs = 4326)
+
+```
+
+
+
+```{r}
+# Convert tibble to sf object
+stations_sf <- st_as_sf(hydrometric_stations,
+                        coords = c("X", "Y"),
+                        crs = 4326)   # WGS84 (EPSG:4326) is the standard lat/long CRS
+
+```
+
+
+```{r}
+ggplot() + 
+    geom_sf(data = boundary) +
+    geom_sf(data = stations_sf) + 
+    geom_sf(data = stations_sf  |>  slice(c(36, 37, 39, 49)), colour = "red", size = 3)
+```
+
+
+## Flow Data
+```{r}
+sheets = readxl::excel_sheets("../Hydrological_data/Flow data.xlsx")
+flow = list()
+for(j in 1:length(sheets)){
+    flow[[j]] = readxl::read_xlsx("../Hydrological_data/Flow data.xlsx", skip = 3) |>  
+        mutate(river = sheets[j])
+}
+```
+
+
+```{r}
+flow_tb = flow |>  
+    bind_rows() |>  
+    mutate(
+        Date = as.Date(Date),
+        year = lubridate::year(Date),
+        month = lubridate::month(Date),
+        month_name = lubridate::month(Date, label = TRUE),
+        day = lubridate::day(Date),
+        .after = Date
+        )
+```
+
+
+```{r}
+flow_tb |> 
+    group_by(year, month_name) |> 
+    summarize(median_flow = median(`Average flow cumecs`, na.rm = TRUE), .groups = "drop") |> 
+    pivot_wider(names_from = month_name, values_from = median_flow) |> 
+    gt() |>  
+    fmt_number(columns = 2:13, decimals = 2) |> 
+    fmt_missing(columns = everything(), missing_text = "-") |> 
+    data_color(columns = 2:13, palette = "Reds", method = "factor", direction = "row")
+```
+
+## Rainfall Data at Usokami
+```{r}
+rainfall = readxl::read_xlsx("../Hydrological_data/Rainfall Data  Usokami.xlsx", skip = 2) 
+```
+
+
+```{r}
+rainfall_tb = rainfall |> 
+    select(-YEAR)|>  
+    mutate(
+        Date = lubridate::dmy(Date),
+        year = lubridate::year(Date),
+        month = lubridate::month(Date),
+        month_name = lubridate::month(Date, label = TRUE),
+        day = lubridate::day(Date),
+        .after = Date
+        )
+```
+
+
+```{r}
+rainfall_tb |> 
+    group_by(year, month_name) |> 
+    summarize(sum_ppt = sum(`Precipitation(mm)`, na.rm = TRUE), .groups = "drop") |> 
+    pivot_wider(names_from = month_name, values_from = sum_ppt) |> 
+    gt() |>  
+    fmt_number(columns = 2:13, decimals = 1) |> 
+    fmt_missing(columns = everything(), missing_text = "-") |> 
+    data_color(columns = 2:13, palette = "Reds", method = "factor", direction = "row")
+```
+
+## Temperature Data at Usokami
+```{r}
+temperature = readxl::read_xlsx("../Hydrological_data/Temperature data Usokami.xlsx", skip = 2) 
+```
+
+
+```{r}
+temperature_tb = temperature |> 
+    select(-Year)|>  
+    mutate(
+        Date = lubridate::dmy(Date),
+        year = lubridate::year(Date),
+        month = lubridate::month(Date),
+        month_name = lubridate::month(Date, label = TRUE),
+        day = lubridate::day(Date),
+        .after = Date
+        )
+```
+
+
+```{r}
+temperature_tb |> 
+    group_by(year, month_name) |> 
+    summarize(max_temp = max(Temperature, na.rm = TRUE), .groups = "drop") |> 
+    pivot_wider(names_from = month_name, values_from = max_temp) |> 
+    gt() |>  
+    fmt_number(columns = 2:13, decimals = 1) |> 
+    fmt_missing(columns = everything(), missing_text = "-") |> 
+    data_color(columns = 2:13, palette = "Reds", method = "factor", direction = "row")
+```

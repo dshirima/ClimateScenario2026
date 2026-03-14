@@ -10,6 +10,7 @@ format:
     toc: true
     number-sections: true
 embed-resources: true  
+bibliography: 
 ---
 
 # Executive Summary

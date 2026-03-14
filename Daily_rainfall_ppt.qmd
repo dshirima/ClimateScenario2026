@@ -1,0 +1,79 @@
+---
+title: "Untitled"
+format: html
+---
+
+```{r}
+require(tidyverse)
+require(terra)
+require(sf)
+```
+
+
+```{r}
+boundary <- read_sf("C:/AgriCARS_Data/SPATIAL/CC Adaptation/Revised_Boundary/Boundary.shp")
+
+plot(boundary)
+```
+
+
+```{r}
+chirp <- terra::rast("https://data.chc.ucsb.edu/products/CHIRP/daily/2024/chirp.2024.01.01.tif")
+```
+
+
+```{r}
+# Convert sf object to SpatVector (terra format)
+boundary_vect <- vect(boundary)
+
+```
+
+
+```{r}
+# Inspect CRS
+crs(boundary_vect)
+crs(chirp)
+
+# If CRS differ, reproject boundary to raster CRS
+boundary_vect <- project(boundary_vect, chirp)
+
+# Now crop and mask
+chirp_crop <- crop(chirp, boundary_vect)
+chirp_mask <- mask(chirp_crop, boundary_vect)
+
+plot(chirp_mask)
+```
+
+```{r}
+library(lubridate)
+library(stringr)
+
+# Create daily sequence for 2024
+myday <- seq(dmy("01-01-2024"), dmy("31-12-2024"), by = "day") |>
+  as.character() |>
+  str_replace_all("-", ".")
+```
+
+```{r}
+day_rain=list()
+
+for(i in 1:5) {
+kiokoto = paste0("https://data.chc.ucsb.edu/products/CHIRP/daily/2024/chirp.",myday[i],".tif")
+day_rain [[i]] = terra::rast(kiokoto)
+print(paste(myday[i],"done"))
+}
+```
+
+```{r}
+dailyrain_kilombera = day_rain %>% rast() %>% crop(boundary_vect, mask = FALSE)
+# dailyrain_kilombera %>% terra::writeraster("day_rain_2024.tif")
+
+```
+
+```{r}
+ggplot() + 
+    geom_spatraster(dailyrain_kilombera) + 
+    geom_sf(data = boundary_vect, fill = NA, line width = 1.2, colour = "black") +
+    scale_fillgradientn(colours = rainbow(6) %>% rev(), trans=scales::modulus_trans(p = 0.05)) +
+    facet_wrap(~lyr)
+```
